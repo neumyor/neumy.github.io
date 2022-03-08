@@ -1,0 +1,549 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/favicon.png">
+  <link rel="icon" href="/img/favicon.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="neumy">
+  <meta name="keywords" content="">
+  
+    <meta name="description" content="OO 电梯算法设计与多线程模拟[TOC] 锁和同步块的分析本次单元作业中，线程间同步是主要的难点。在进行架构设计时，我重点考虑了通过精简共享对象层次，来简化锁和同步块的设置逻辑。 同步块中的处理语句，通常与访问、操作某一对象有关。在这里我们也考虑一个问题：行为互斥的定义，即我们究竟应该在什么情况下占有对象并构成互斥访问。显然，电梯问题中的请求传递可以看做一个Producer-Consumer问题，">
+<meta property="og:type" content="article">
+<meta property="og:title" content="面向对象设计与构造课程笔记节选">
+<meta property="og:url" content="https://neumyor.github.io/2021/05/08/OO%20Elevator%20Problem/index.html">
+<meta property="og:site_name" content="neumy">
+<meta property="og:description" content="OO 电梯算法设计与多线程模拟[TOC] 锁和同步块的分析本次单元作业中，线程间同步是主要的难点。在进行架构设计时，我重点考虑了通过精简共享对象层次，来简化锁和同步块的设置逻辑。 同步块中的处理语句，通常与访问、操作某一对象有关。在这里我们也考虑一个问题：行为互斥的定义，即我们究竟应该在什么情况下占有对象并构成互斥访问。显然，电梯问题中的请求传递可以看做一个Producer-Consumer问题，">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://neumyor.github.io/2021/05/08/OO%20Elevator%20Problem/img/blog/2028226-20210422195559435-63556865.png">
+<meta property="og:image" content="https://neumyor.github.io/2021/05/08/OO%20Elevator%20Problem/img/blog/2028226-20210422195504112-471816275.png">
+<meta property="og:image" content="https://neumyor.github.io/2021/05/08/OO%20Elevator%20Problem/img/blog/2028226-20210422195535804-304909211.png">
+<meta property="og:image" content="https://neumyor.github.io/2021/05/08/OO%20Elevator%20Problem/img/blog/2028226-20210422193013164-1380896757.png">
+<meta property="og:image" content="https://neumyor.github.io/2021/05/08/OO%20Elevator%20Problem/img/blog/2028226-20210422193037410-74740467.png">
+<meta property="og:image" content="https://neumyor.github.io/2021/05/08/OO%20Elevator%20Problem/img/blog/2028226-20210422193052116-509484603.png">
+<meta property="og:image" content="https://neumyor.github.io/2021/05/08/OO%20Elevator%20Problem/img/blog/2028226-20210422193119769-870604675.png">
+<meta property="og:image" content="https://neumyor.github.io/2021/05/08/OO%20Elevator%20Problem/img/blog/2028226-20210422202557927-263827552.png">
+<meta property="article:published_time" content="2021-05-08T10:00:00.000Z">
+<meta property="article:modified_time" content="2022-03-08T13:52:24.886Z">
+<meta property="article:author" content="neumy">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://neumyor.github.io/2021/05/08/OO%20Elevator%20Problem/img/blog/2028226-20210422195559435-63556865.png">
+  
+  
+  <title>面向对象设计与构造课程笔记节选 - neumy</title>
+
+  <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4/dist/css/bootstrap.min.css" />
+
+
+  <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@4/github-markdown.min.css" />
+  <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/hint.css@2/hint.min.css" />
+
+  
+    
+    
+      
+      <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@10/styles/github-gist.min.css" />
+    
+  
+
+  
+    <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3/dist/jquery.fancybox.min.css" />
+  
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1749284_ba1fz6golrf.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1736178_lbnruvf0jn.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+<!-- 自定义样式保持在最底部 -->
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    var CONFIG = {"hostname":"neumyor.github.io","root":"/","version":"1.8.14","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"right","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"copy_btn":true,"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":false,"baidu":null,"google":null,"gtag":null,"tencent":{"sid":null,"cid":null},"woyaola":null,"cnzz":null,"leancloud":{"app_id":null,"app_key":null,"server_url":null,"path":"window.location.pathname","ignore_local":false}},"search_path":"/local-search.xml"};
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+<meta name="generator" content="Hexo 6.0.0"></head>
+
+
+<body>
+  <header style="height: 70vh;">
+    <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>neumyog</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="iconfont icon-home-fill"></i>
+                首页
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/">
+                <i class="iconfont icon-tags-fill"></i>
+                标签
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/">
+                <i class="iconfont icon-archive-fill"></i>
+                归档
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/">
+                <i class="iconfont icon-user-fill"></i>
+                关于
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              &nbsp;<i class="iconfont icon-search"></i>&nbsp;
+            </a>
+          </li>
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">&nbsp;<i
+                class="iconfont icon-dark" id="color-toggle-icon"></i>&nbsp;</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+    <div class="banner" id="banner" parallax=true
+         style="background: url('/img/bg/page_bg.png') no-repeat center center;
+           background-size: cover;">
+      <div class="full-bg-img">
+        <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+          <div class="page-header text-center fade-in-up">
+            <span class="h2" id="subtitle" title="当时这篇博客在系里还算蛮热门的hhh">
+              
+            </span>
+
+            
+              <div class="mt-3">
+  
+  
+    <span class="post-meta">
+      <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+      <time datetime="2021-05-08 10:00" pubdate>
+        2021年5月8日 上午
+      </time>
+    </span>
+  
+</div>
+
+<div class="mt-1">
+  
+    <span class="post-meta mr-2">
+      <i class="iconfont icon-chart"></i>
+      4k 字
+    </span>
+  
+
+  
+    <span class="post-meta mr-2">
+      <i class="iconfont icon-clock-fill"></i>
+      
+      
+      34 分钟
+    </span>
+  
+
+  
+  
+</div>
+
+            
+          </div>
+
+          
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="d-none d-lg-block col-lg-2"></div>
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div class="py-5" id="board">
+          <article class="post-content mx-auto">
+            <!-- SEO header -->
+            <h1 style="display: none">当时这篇博客在系里还算蛮热门的hhh</h1>
+            
+            <div class="markdown-body">
+              <h1 id="OO-电梯算法设计与多线程模拟"><a href="#OO-电梯算法设计与多线程模拟" class="headerlink" title="OO 电梯算法设计与多线程模拟"></a>OO 电梯算法设计与多线程模拟</h1><p>[TOC]</p>
+<h2 id="锁和同步块的分析"><a href="#锁和同步块的分析" class="headerlink" title="锁和同步块的分析"></a>锁和同步块的分析</h2><p>本次单元作业中，线程间同步是主要的难点。在进行架构设计时，我重点考虑了<strong>通过精简共享对象层次，来简化锁和同步块的设置逻辑</strong>。</p>
+<p>同步块中的处理语句，通常与访问、操作某一对象有关。在这里我们也考虑一个问题：<strong>行为互斥的定义</strong>，即我们究竟应该在什么情况下占有对象并构成互斥访问。显然，<strong>电梯问题中的请求传递</strong>可以看做一个Producer-Consumer问题，而<strong>调度器对电梯状态的查看</strong>是一个Read&amp;Write问题。</p>
+<p>在第一次作业中，我没有采用调度器，而是直接通过InputThread向ElevatorThread写入请求。在这个过程中只存在简单的Producer-Consumer关系，故我在电梯的请求队列上加锁，实现InputThread放入请求和电梯处理并移除请求的互斥。</p>
+<p>在第二次作业中，我使用调度器Controller来缓存InputThread发送的请求，并查看各个电梯的状态并据此分析请求的派发行为。因此这里又涉及一个Producer-Consumer问题，故我将Controller进行了加锁从而规范读写行为。</p>
+<p>我刚开始将电梯的状态ElevatorStatus进行了加锁，而将Elevator的请求队列ElevatorBuffer和ElevatorStatus分开看待。随后，我仔细分析了电梯的行为，<strong>发现InputThread在获取ElevatorStatus后就会放入请求，而Elevator处理了请求后就会改变ElevatorStatus</strong>，这意味着ElevatorBuffer和ElevatorStatus具有逻辑上的耦合性，因此我将两者合并为电梯的数据集合——Elevator对象，并将Elevator的行为抽象为策略集合——ElevatorStrategy对象。ElevatorStrategy和Elevator组装为ElevatorRunnable对象，并<strong>针对Elevator这一个数据对象进行加锁</strong>。</p>
+<p>在第三次作业中，我<strong>撤销了调度器的设计</strong>，因此不再对Controller进行加锁。同时引入了全局状态对象GlobalEnv，用于<strong>保存各个进程的状态</strong>，从而实现各个线程状态间的感知。Elevator间从等待队列中竞争请求，因此<strong>演变为Read&amp;Write问题</strong>，允许同步读、读写异步。故设置了读写互斥锁等对象（存在在GlobalEnv中）。</p>
+<h2 id="交互架构设计"><a href="#交互架构设计" class="headerlink" title="交互架构设计"></a>交互架构设计</h2><h3 id="第一次作业"><a href="#第一次作业" class="headerlink" title="第一次作业"></a>第一次作业</h3><p>简单的从InputThread向ElevatorThread写入请求，构成Producer-Consumer模型。</p>
+<h3 id="第二次作业"><a href="#第二次作业" class="headerlink" title="第二次作业"></a>第二次作业</h3><p>添加调度器Controller，接受InputThread发送的请求并缓存，分析每个电梯的状态并决定请求的分发。电梯只面向自己被分派到的请求进行策略调度。因此将整体策略分为两个部分——分派策略ControllerStrategy和调度策略ElevatorStrategy。</p>
+<h3 id="第三次作业"><a href="#第三次作业" class="headerlink" title="第三次作业"></a>第三次作业</h3><p>第三次作业的更新主要在以下几点：</p>
+<ul>
+<li>将PersonRequest添加换乘策略PersonStrategy，包装为Person对象。</li>
+<li>利用GlobalEnv对象进行全局对象的保存，并据此调度各个进程的退出。</li>
+<li>移除ControllerThread，而仅保留Controller数据对象，作为请求的缓存区。</li>
+<li>ElevatorThread从Controller中竞争请求，在每一层先将能够处理的请求预装载至自己的缓存区，然后再开门装入。</li>
+</ul>
+<p>Person类的包装是实现换乘的主要保证。通过<strong>Person对PersonRequest的封装</strong>，将换乘的策略写在Person类自身中，同电梯的调度策略分离，降低了电梯的职责负担。</p>
+<p>每个Elevator都会同时观察Controller和其他电梯，当InputThread退出后且Controller为空且其他Elevator缓存区没有请求，将退出。Controller在InputThread退出且所有电梯均退出后将退出。</p>
+<p>Elevator使用LOOK算法，<strong>具有自主选择乘客的策略，并能够通过预装载来实现电梯间的竞争</strong>，故Controller的分配策略从主动分配改为被动给予，因此Controller不再具有行为，不再需要单独的线程。</p>
+<h2 id="第三作业架构设计及可拓展性论述"><a href="#第三作业架构设计及可拓展性论述" class="headerlink" title="第三作业架构设计及可拓展性论述"></a>第三作业架构设计及可拓展性论述</h2><h3 id="量化视角"><a href="#量化视角" class="headerlink" title="量化视角"></a>量化视角</h3><p>利用DesigniteJava对代码进行分析，获得了代码的量化评估结果：</p>
+<p><img src="img/blog/2028226-20210422195559435-63556865.png" srcset="/img/loading.gif" lazyload alt="行数统计数据"></p>
+<p><img src="img/blog/2028226-20210422195504112-471816275.png" srcset="/img/loading.gif" lazyload alt="代码Smell统计数据"></p>
+<p>从结果上看，代码的整体的<strong>代码行数分布较为均匀且合理</strong>，符合编写规范。核心类的<strong>内聚合度高，复用性高</strong>，符合高内聚低耦合的设计要求。</p>
+<h3 id="全局变量GlobalEnv"><a href="#全局变量GlobalEnv" class="headerlink" title="全局变量GlobalEnv"></a>全局变量GlobalEnv</h3><p>全局变量GlobalEnv应用了单例模式，用于解决共享变量传递的问题，同时能够反映整体程序的全局状态，用于指导各个线程的退出。</p>
+<p><img src="img/blog/2028226-20210422195535804-304909211.png" srcset="/img/loading.gif" lazyload alt="GlobalEnv对象"></p>
+<h3 id="电梯Elevator"><a href="#电梯Elevator" class="headerlink" title="电梯Elevator"></a>电梯Elevator</h3><h4 id="线程运行逻辑"><a href="#线程运行逻辑" class="headerlink" title="线程运行逻辑"></a>线程运行逻辑</h4><p>电梯主要依靠ElevatorRunnable执行运行，其主要行为为做出决定，然后执行。</p>
+<p>Elevator类除了Status外，还存放了当前电梯的<strong>类型、可抵达楼层等信息</strong>，其由ElevatorFactory进行初始化，由此实现了对电梯类型方面的可拓展性。</p>
+<p>Decision包含一个对当前Elevator对象的引用，使得其execute方法能够改变Elevator的状态（修改当前楼层、读写缓存区请求等）。同时，<strong>Decision还能从全局变量GlobalEnv中获取Controller对象，从而在换乘时将请求放回等待队列</strong>。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><div class="code-wrapper"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></div></td><td class="code"><pre><code class="hljs java"><span class="hljs-meta">@Override</span><br>    <span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">run</span><span class="hljs-params">()</span> &#123;<br>        <span class="hljs-type">AnalyzeAndDecide</span> <span class="hljs-variable">strategy</span> <span class="hljs-operator">=</span> strategyMap.get(globalenv.getPattern());<br>        <span class="hljs-keyword">while</span> (<span class="hljs-literal">true</span>) &#123;<br>            Decision decision;<br>            <span class="hljs-keyword">synchronized</span> (elevator) &#123;<br>                decision = strategy.decide(elevator);<br>                <span class="hljs-keyword">if</span> (decision == <span class="hljs-literal">null</span>) &#123;<br>                    <span class="hljs-keyword">return</span>; <span class="hljs-comment">// 如果策略决定要退出, 会返回null</span><br>                &#125;<br>            &#125;<br>            decision.execute(); <span class="hljs-comment">// 调用execute方法执行决定</span><br>        &#125;<br>    &#125;<br></code></pre></td></tr></table></figure>
+<p><img src="img/blog/2028226-20210422193013164-1380896757.png" srcset="/img/loading.gif" lazyload alt="整体架构"></p>
+<p><img src="img/blog/2028226-20210422193037410-74740467.png" srcset="/img/loading.gif" lazyload alt="Decision类的架构"></p>
+<h4 id="电梯调度算法"><a href="#电梯调度算法" class="headerlink" title="电梯调度算法"></a>电梯调度算法</h4><p>采用LOOK算法，利用有限状态机进行构造。预装载（preload）即定义了<strong>电梯的竞争行为</strong>，其从调度器中按一定条件竞争请求并预装载到自己的缓存区中。</p>
+<p>我并没有针对各种模式进行优化，原因如下：</p>
+<ol>
+<li>经过测试，在全随机的Night和Morning情景下，LOOK算法能够比定制化算法具有基本相近的性能，甚至可以更好。</li>
+<li>在边界条件下，LOOK算法具有较高的性能，与定制化算法差距不大，不会引发TLE。</li>
+<li>考虑互测中可能遇到特意针对定制化策略的边界数据，使用定制化算法可能被狙击。</li>
+</ol>
+<p><img src="img/blog/2028226-20210422193052116-509484603.png" srcset="/img/loading.gif" lazyload alt="电梯调度算法对应的有限自动机"></p>
+<h3 id="PersonRequest的包装——Person类"><a href="#PersonRequest的包装——Person类" class="headerlink" title="PersonRequest的包装——Person类"></a>PersonRequest的包装——Person类</h3><p>Person类包含一个对PersonRequest的引用，并根据其分析了当前请求的换乘类型，并利用状态转换实现了换乘状态的转化。在调用了Person的getOut()方法后，其内部状态会改变，从而影响wantToGetIn()和wantToGetOut()的返回值。<strong>由于采用了状态的转换与换乘类型的独立设置</strong>，因此具有较强的拓展性，可以根据不同的类型设置不同的换乘策略而不影响其他类型的换乘行为。</p>
+<p><img src="img/blog/2028226-20210422193119769-870604675.png" srcset="/img/loading.gif" lazyload alt="Person类"></p>
+<h3 id="线程间交互"><a href="#线程间交互" class="headerlink" title="线程间交互"></a>线程间交互</h3><p>线程间<strong>对于共享对象的互斥访问是经过特地论证的</strong>，因此避免了死锁。（事实上我实现了锁的无嵌套，将在接下来谈一下实现的Trick）。</p>
+<p>请注意，Controller和GlobalEnv只是一个共享数据对象而并不是一个线程。</p>
+<p>具体交互请看下图：</p>
+<p><img src="img/blog/2028226-20210422202557927-263827552.png" srcset="/img/loading.gif" lazyload alt="线程交互流程"></p>
+<h2 id="实现Deadlock-Free的小Trick"><a href="#实现Deadlock-Free的小Trick" class="headerlink" title="实现Deadlock Free的小Trick"></a>实现Deadlock Free的小Trick</h2><p>在设计架构时我就考虑了过多的复杂的锁会造成锁的嵌套关系复杂，最终导致死锁发生时分析困难。因此，我尽量将访问上具有联系的对象打包成一个对象或共用一个锁，避免锁的嵌套。这也源自我将<strong>数据和行为</strong>分离的设想，这样使得数据之间更为集中，更利于打包成一个对象。</p>
+<p>同时，注意<strong>及时释放锁</strong>。这里的及时释放锁既包括在不再访问对象时释放锁，也包括<strong>合理安排行为顺序，从而尽可能早地结束对对象的访问</strong>。这一点上我使用的trick是，在访问某个对象A时，<strong>如果在获得A的锁后需要访问另一个对象B（并获得B的锁）后还需要访问对象A的数据时，先拷贝对象A然后释放A的锁，再访问对象B</strong>。</p>
+<p>最终我在程序中实现了没有锁的嵌套情况，这也使得我不用考虑死锁会带来影响。</p>
+<h2 id="Bug测试策略"><a href="#Bug测试策略" class="headerlink" title="Bug测试策略"></a>Bug测试策略</h2><p>本单元主要测试方向在于：</p>
+<ol>
+<li>死锁：如何寻找对象的死锁情况？如何命中？</li>
+<li>低效策略：如何利用边界数据卡出TLE？</li>
+</ol>
+<p>对于第一点，我采用<strong>直接分析代码</strong>的方式。当然，分析也需要策略。编写程序通过对synchronize关键字的嵌套查找，来自动寻找各个对象的嵌套关系。<strong>一旦发现在两个不同线程中两个对象的锁可能构成死锁</strong>，则尽可能设计数据诱导死锁的发生。诱导过程主要通过<strong>高数据量的针对性数据</strong>来实现。</p>
+<p>对于第二点，采用特殊数据，以边界条件去测试调度算法。特殊数据的构造纯粹出于人为分析题目要求并构造，此处不再赘述。</p>
+<h2 id="心得体会"><a href="#心得体会" class="headerlink" title="心得体会"></a>心得体会</h2><h3 id="线程安全"><a href="#线程安全" class="headerlink" title="线程安全"></a>线程安全</h3><p>线程安全方面，我认为<strong>前期分析和架构设计非常重要</strong>。尽可能早地精简共享对象，使得共享关系更加简洁，避免锁的嵌套或设计合适策略来处理死锁（比如利用信号量）。只要在架构上论证了线程间的安全性，那么就可以大胆去进行具体代码的编写，无需在编写过程中再去考虑线程安全问题，这样能够提高效率也能降低后期Debug的难度。</p>
+<h3 id="层次化设计"><a href="#层次化设计" class="headerlink" title="层次化设计"></a>层次化设计</h3><p>我理解的层次化设计，是<strong>将复杂的业务逻辑通过分析，拆分成多个层次的简单逻辑</strong>。在本次实验中<strong>将复杂的策略分担给多个对象，每个对象实现较为简单的某个特定方向上的策略</strong>，极大地降低了de策略bug时的难度，也使得我更加便捷地测试不同策略组合对于性能的影响。</p>
+
+            </div>
+            <hr>
+            <div>
+              <div class="post-metas mb-3">
+                
+                
+              </div>
+              
+                <p class="note note-warning">
+                  
+                    本博客所有文章除特别声明外，均采用 <a target="_blank" href="https://creativecommons.org/licenses/by-sa/4.0/deed.zh" rel="nofollow noopener noopener">CC BY-SA 4.0 协议</a> ，转载请注明出处！
+                  
+                </p>
+              
+              
+                <div class="post-prevnext">
+                  <article class="post-prev col-6">
+                    
+                    
+                      <a href="/2021/06/06/OS%20Lab4%20Fork/">
+                        <i class="iconfont icon-arrowleft"></i>
+                        <span class="hidden-mobile">系统调用与Fork的实现（个人OS课设笔记节选）</span>
+                        <span class="visible-mobile">上一篇</span>
+                      </a>
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+              <!-- Comments -->
+              <article class="comments" id="comments" lazyload>
+                
+                  
+                
+                
+  <div id="gitalk-container"></div>
+  <script type="text/javascript">
+    Fluid.utils.loadComments('#gitalk-container', function() {
+      Fluid.utils.createCssLink('/css/gitalk.css')
+      Fluid.utils.createScript('https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', function() {
+        var options = Object.assign(
+          {"clientID":"533ca9e230c278125ce3","clientSecret":"8d95c044ec6ae97f7158bef00454103d93ee9b71","repo":"neumyor.github.io","owner":"neumyor","admin":["neumyor"],"language":"zh-CN","labels":["Gitalk"],"perPage":10,"pagerDirection":"first","distractionFreeMode":false,"createIssueManually":true,"proxy":"https://cors-anywhere.azm.workers.dev/https://github.com/login/oauth/access_token"},
+          {
+            id: 'daecc948f4a49311fbfddec62074fa63'
+          }
+        )
+        var gitalk = new Gitalk(options);
+        gitalk.render('gitalk-container');
+      });
+    });
+  </script>
+  <noscript>Please enable JavaScript to view the comments</noscript>
+
+
+              </article>
+            
+          </article>
+        </div>
+      </div>
+    </div>
+    
+      <div class="d-none d-lg-block col-lg-2 toc-container" id="toc-ctn">
+        <div id="toc">
+  <p class="toc-header"><i class="iconfont icon-list"></i>&nbsp;目录</p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+      </div>
+    
+  </div>
+</div>
+
+<!-- Custom -->
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v"
+                 for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+
+    
+  </main>
+
+  <footer class="text-center mt-5 py-3">
+  <div class="footer-content">
+     <a href="https://www.cnblogs.com/neumy/" target="_blank" rel="nofollow noopener"><span>don't touch me</span></a> <script> var link = document.querySelector("link[rel*='icon']") || document.createElement('link'); link.type = 'image/x-icon'; link.rel = 'shortcut icon'; link.href = '/img/favicon.ico'; document.getElementsByTagName('head')[0].appendChild(link); </script> <script type="text/javascript"> var s = unescape("\u0069\u0066\u0072\u0061\u006d\u0065"); var f = '<'+s+' frameborder="no" border="0" marginwidth="0" marginheight="0" width="280" height="82"  src="//music.163.com/outchain/player?type=2&id=41666273&auto=0&height=66" class="music" style="z-index: 0;left: 0PX;display: block;bottom: 4%;position: fixed;"></'+s+'>'; $("body").append(f);  </script> 
+  </div>
+  
+
+  
+
+  
+</footer>
+
+
+  <!-- SCRIPTS -->
+  
+  <script  src="https://cdn.jsdelivr.net/npm/nprogress@0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nprogress@0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js" ></script>
+<script  src="https://cdn.jsdelivr.net/npm/bootstrap@4/dist/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+<!-- Plugins -->
+
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+  
+
+
+
+  
+    <script  src="https://cdn.jsdelivr.net/npm/tocbot@4/dist/tocbot.min.js" ></script>
+  
+  
+    <script  src="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3/dist/jquery.fancybox.min.js" ></script>
+  
+  
+    <script  src="https://cdn.jsdelivr.net/npm/anchor-js@4/anchor.min.js" ></script>
+  
+  
+    <script defer src="https://cdn.jsdelivr.net/npm/clipboard@2/dist/clipboard.min.js" ></script>
+  
+
+
+
+
+
+
+  <script  src="https://cdn.jsdelivr.net/npm/typed.js@2/lib/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var title = document.getElementById('subtitle').title;
+      
+        typing(title);
+      
+    })(window, document);
+  </script>
+
+
+
+
+
+  
+
+  
+    <!-- MathJax -->
+    <script>
+      MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']]
+        },
+        loader: {
+          load: ['ui/lazy']
+        },
+        options: {
+          renderActions: {
+            findScript: [10, doc => {
+              document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+                const display = !!node.type.match(/; *mode=display/);
+                const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+                const text = document.createTextNode('');
+                node.parentNode.replaceChild(text, node);
+                math.start = { node: text, delim: '', n: 0 };
+                math.end = { node: text, delim: '', n: 0 };
+                doc.math.push(math);
+              });
+            }, '', false],
+            insertedScript: [200, () => {
+              document.querySelectorAll('mjx-container').forEach(node => {
+                let target = node.parentNode;
+                if (target.nodeName.toLowerCase() === 'li') {
+                  target.parentNode.classList.add('has-jax');
+                }
+              });
+            }, '', false]
+          }
+        }
+      };
+    </script>
+
+    <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" ></script>
+
+  
+
+
+
+
+
+
+
+
+
+
+
+<!-- 主题的启动项 保持在最底部 -->
+<script  src="/js/boot.js" ></script>
+
+
+</body>
+</html>

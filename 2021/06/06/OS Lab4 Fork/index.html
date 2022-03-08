@@ -1,0 +1,590 @@
+
+
+<!DOCTYPE html>
+<html lang="zh-CN" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/favicon.png">
+  <link rel="icon" href="/img/favicon.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="neumy">
+  <meta name="keywords" content="">
+  
+    <meta name="description" content="OS课程设计 系统调用与fork实现 我打算从当前lab开始进行OS学习总结的分享。（前几个Lab因为缺乏形式化表述，所以总是有些bug，怕发出来误人子弟。lab4对之前的lab都做了一次检查，目前代码总体上相对较为规范）  本单元主要实现：  系统调用的概念和流程 进程间的通讯（IPC） fork函数实现 缺页中断的处理流程  系统调用什么是系统调用在硬件实现上，用户态的进程无法访问内核的地址空">
+<meta property="og:type" content="article">
+<meta property="og:title" content="系统调用与Fork的实现（个人OS课设笔记节选）">
+<meta property="og:url" content="https://neumyor.github.io/2021/06/06/OS%20Lab4%20Fork/index.html">
+<meta property="og:site_name" content="neumy">
+<meta property="og:description" content="OS课程设计 系统调用与fork实现 我打算从当前lab开始进行OS学习总结的分享。（前几个Lab因为缺乏形式化表述，所以总是有些bug，怕发出来误人子弟。lab4对之前的lab都做了一次检查，目前代码总体上相对较为规范）  本单元主要实现：  系统调用的概念和流程 进程间的通讯（IPC） fork函数实现 缺页中断的处理流程  系统调用什么是系统调用在硬件实现上，用户态的进程无法访问内核的地址空">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://neumyor.github.io/2021/06/06/OS%20Lab4%20Fork/img/blog/2028226-20210510193425197-1567369399.png">
+<meta property="og:image" content="https://neumyor.github.io/2021/06/06/OS%20Lab4%20Fork/img/blog/2028226-20210510193827711-1922362404.png">
+<meta property="og:image" content="https://neumyor.github.io/2021/06/06/OS%20Lab4%20Fork/img/blog/2028226-20210510193501253-604653255.png">
+<meta property="article:published_time" content="2021-06-06T10:00:00.000Z">
+<meta property="article:modified_time" content="2022-03-08T13:52:24.886Z">
+<meta property="article:author" content="neumy">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://neumyor.github.io/2021/06/06/OS%20Lab4%20Fork/img/blog/2028226-20210510193425197-1567369399.png">
+  
+  
+  <title>系统调用与Fork的实现（个人OS课设笔记节选） - neumy</title>
+
+  <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4/dist/css/bootstrap.min.css" />
+
+
+  <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@4/github-markdown.min.css" />
+  <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/hint.css@2/hint.min.css" />
+
+  
+    
+    
+      
+      <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@10/styles/github-gist.min.css" />
+    
+  
+
+  
+    <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3/dist/jquery.fancybox.min.css" />
+  
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1749284_ba1fz6golrf.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/font_1736178_lbnruvf0jn.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+<!-- 自定义样式保持在最底部 -->
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    var CONFIG = {"hostname":"neumyor.github.io","root":"/","version":"1.8.14","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"right","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"copy_btn":true,"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":false,"baidu":null,"google":null,"gtag":null,"tencent":{"sid":null,"cid":null},"woyaola":null,"cnzz":null,"leancloud":{"app_id":null,"app_key":null,"server_url":null,"path":"window.location.pathname","ignore_local":false}},"search_path":"/local-search.xml"};
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+<meta name="generator" content="Hexo 6.0.0"></head>
+
+
+<body>
+  <header style="height: 70vh;">
+    <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>neumyog</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/">
+                <i class="iconfont icon-home-fill"></i>
+                首页
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/">
+                <i class="iconfont icon-tags-fill"></i>
+                标签
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/">
+                <i class="iconfont icon-archive-fill"></i>
+                归档
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/">
+                <i class="iconfont icon-user-fill"></i>
+                关于
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              &nbsp;<i class="iconfont icon-search"></i>&nbsp;
+            </a>
+          </li>
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">&nbsp;<i
+                class="iconfont icon-dark" id="color-toggle-icon"></i>&nbsp;</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+    <div class="banner" id="banner" parallax=true
+         style="background: url('/img/bg/page_bg.png') no-repeat center center;
+           background-size: cover;">
+      <div class="full-bg-img">
+        <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+          <div class="page-header text-center fade-in-up">
+            <span class="h2" id="subtitle" title="觉得自己写的还挺好(">
+              
+            </span>
+
+            
+              <div class="mt-3">
+  
+  
+    <span class="post-meta">
+      <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+      <time datetime="2021-06-06 10:00" pubdate>
+        2021年6月6日 上午
+      </time>
+    </span>
+  
+</div>
+
+<div class="mt-1">
+  
+    <span class="post-meta mr-2">
+      <i class="iconfont icon-chart"></i>
+      3.7k 字
+    </span>
+  
+
+  
+    <span class="post-meta mr-2">
+      <i class="iconfont icon-clock-fill"></i>
+      
+      
+      32 分钟
+    </span>
+  
+
+  
+  
+</div>
+
+            
+          </div>
+
+          
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="d-none d-lg-block col-lg-2"></div>
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div class="py-5" id="board">
+          <article class="post-content mx-auto">
+            <!-- SEO header -->
+            <h1 style="display: none">觉得自己写的还挺好(</h1>
+            
+            <div class="markdown-body">
+              <h1 id="OS课程设计-系统调用与fork实现"><a href="#OS课程设计-系统调用与fork实现" class="headerlink" title="OS课程设计 系统调用与fork实现"></a>OS课程设计 系统调用与fork实现</h1><blockquote>
+<p>我打算从当前lab开始进行OS学习总结的分享。<br>（前几个Lab因为缺乏形式化表述，所以总是有些bug，怕发出来误人子弟。lab4对之前的lab都做了一次检查，目前代码总体上相对较为规范）</p>
+</blockquote>
+<p>本单元主要实现：</p>
+<ol>
+<li><strong>系统调用</strong>的概念和<strong>流程</strong></li>
+<li>进程间的<strong>通讯</strong>（IPC）</li>
+<li>fork函数实现</li>
+<li><strong>缺页中断的处理流程</strong></li>
+</ol>
+<h2 id="系统调用"><a href="#系统调用" class="headerlink" title="系统调用"></a>系统调用</h2><h3 id="什么是系统调用"><a href="#什么是系统调用" class="headerlink" title="什么是系统调用"></a>什么是系统调用</h3><p>在硬件实现上，用户态的进程无法访问内核的地址空间，这意味着：</p>
+<ul>
+<li>无法存取内核内存数据</li>
+<li>无法调用内核函数</li>
+</ul>
+<p>而<strong>所有对硬件的操作都是内核函数</strong>，因此用户需要使用<strong>系统调用</strong>来调用内核的函数。</p>
+<h3 id="进入系统调用"><a href="#进入系统调用" class="headerlink" title="进入系统调用"></a>进入系统调用</h3><p>一件事情在脑海中浮现，在MIPS编程中我们是这样进行输入输出——<strong>向特定寄存器存放特殊值并调用syscall</strong>。而MOS中我们也是这样做的，系统调用的关键就在于用户态和内核态的切换，而这个切换就是在我们调用syscall指令时产生的。</p>
+<p>而就在syscall指令调用后，CPU在硬件层面陷入内核态，其将触发<strong>异常分发</strong>机制，并最终调用到<code>handle_sys()</code>函数。该函数相当于<strong>系统调用的分发</strong>，其根据某特定寄存器的值从而找到需要调用的内核函数。</p>
+<blockquote>
+<p>你将见到这几种函数：</p>
+<ul>
+<li><p>syscall_……：用户空间内的函数，与sys_……成对存在</p>
+</li>
+<li><p>msyscall：设置<strong>系统调用号</strong>并让系统陷入内核态的函数</p>
+</li>
+<li><p>sys_……：内核函数</p>
+<p>有趣的是，在这里我们会发现msyscall需要6个参数，这引起了我们的一个新知识点：<strong>大量的参数是如何进行传递的</strong>？<br>对于$n$个参数的传递，<strong>栈帧sp会保留$n * 4$个字节的空间</strong>，而前4个参数会被放在a0到a3这四个寄存器中，但是栈帧中对应空间还是会被预留，其余参数存储在<strong>前四个参数的预留空间之上的区域</strong>。</p>
+</li>
+</ul>
+</blockquote>
+<p>注意到一个问题，<strong>多于四个的参数会被放到内存中，而这个空间是存在于用户态的</strong>，因此<strong>我们需要在内核中将这些参数转移到内核空间内</strong>，这步工作需要在<code>handle_sys()</code>函数的汇编代码实现了。</p>
+<p>我们先来整理一下在MOS中进行系统调用的流程：</p>
+<ol>
+<li>调用一个封装好的用户空间的库函数（如writef）</li>
+<li>调用用户空间的syscall_* 函数</li>
+<li>调用msyscall，用于陷入内核态</li>
+<li>陷入内核，内核取得信息，执行对应的内核空间的系统调用函数（sys_*）</li>
+<li>执行系统调用，并返回用户态，同时将返回值“传递”回用户态</li>
+<li>从库函数返回，回到用户程序调用处</li>
+</ol>
+<h4 id="msyscall"><a href="#msyscall" class="headerlink" title="msyscall"></a>msyscall</h4><p>msyscall执行的职能只是陷入内核态，并不涉及系统调用的分发。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><div class="code-wrapper"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></div></td><td class="code"><pre><code class="hljs c">syscall<br>jr ra<br>nop<br></code></pre></td></tr></table></figure>
+<h4 id="handle-sys"><a href="#handle-sys" class="headerlink" title="handle_sys"></a>handle_sys</h4><p>syscall发生后，OS根据中断向量发现是调用了系统调用，从而通过中断分发到<code>handle_sys</code>函数。</p>
+<p><code>handle_sys</code>函数通过分析传入的参数来找到具体的系统调用目标函数，并将传入的参数放到寄存器中，然后进入目标函数。</p>
+<h3 id="具体系统调用函数"><a href="#具体系统调用函数" class="headerlink" title="具体系统调用函数"></a>具体系统调用函数</h3><p>所有的系统调用目标函数都在lib/syscall_all.c中定义，他们执行相应的功能，包括对页表的操作、进程的状态转换等等，在此按下不表。</p>
+<h2 id="进程通信-IPC"><a href="#进程通信-IPC" class="headerlink" title="进程通信 IPC"></a>进程通信 IPC</h2><p>进程间通信机制是<strong>基于系统调用</strong>来实现的。通信的本质就是交换数据，而交换数据的最大问题在于：<strong>在进程间，用户地址空间相互独立</strong>。</p>
+<p>因此，我们需要通过<strong>以内核的2g空间来作为传递信息的媒介</strong>，同时我们可以发现，进程控制块是存储在内核空间内的，因此我们完全可以将需要传递的数据放在目标的进程控制块内，然后目标进程在从中读取。</p>
+<p><img src="img/blog/2028226-20210510193425197-1567369399.png" srcset="/img/loading.gif" lazyload alt="通信过程"></p>
+<blockquote>
+<p><em>值得一提的是，由于在我们的用户程序中，会大量使用srcva 为0 的调用来表示不需要传递物理页面，因此在编写相关函数时也需要注意此种情况。</em></p>
+</blockquote>
+<p>这两个过程是通过系统调用中的<code>sys_ipc_recv</code>与<code>sys_ipc_can_send</code>来实现。</p>
+<p>前者需要将当前接收者的进程控制块的相应域设置好，并使用<code>sys_yield</code>使得当前进程放弃CPU。</p>
+<p>后者需要检查目标是否准备好接受，并<strong>修改目标进程的进程控制块</strong>，将需要的信息放到他们的进程控制块内。</p>
+<blockquote>
+<p>需要注意，<em>如果需要传递物理页面信息，需要调用sys_mem_map函数将当前进程srcva对应位置的页面映射到目标进程的dstva处</em>。</p>
+</blockquote>
+<h2 id="Fork函数"><a href="#Fork函数" class="headerlink" title="Fork函数"></a>Fork函数</h2><p>fork函数能够从一个进程生成另一个进程，使得子进程拥有和旧进程绝大部分相同的信息。同时，<strong>fork会在父子进程中拥有不同的返回值</strong>。</p>
+<ul>
+<li>在fork 之前的代码段只有父进程会执行。</li>
+<li>在fork 之后的代码段父子进程都会执行。</li>
+<li>fork 在不同的进程中返回值不一样，在父进程中返回值不为0，在子进程中返回值为0。</li>
+<li>父进程和子进程虽然很多信息相同，但他们的env_id 是不同的。</li>
+</ul>
+<p><img src="img/blog/2028226-20210510193827711-1922362404.png" srcset="/img/loading.gif" lazyload alt="Fork函数行为过程"></p>
+<h3 id="写时复制机制"><a href="#写时复制机制" class="headerlink" title="写时复制机制"></a>写时复制机制</h3><p>父进程会为子进程设置虚拟空间，但是我们通过上图能够发现，<strong>实际的分配过程其实是通过duppage复制页表，并设置PTE_COW</strong>。COW就是写时复制的意思（Copy On Write）。</p>
+<p>只有当父子进程中有修改内存的举动时，内核会根据PTE_COW捕获中断（一般指缺页中断，Page Fault），并单独为修改内存的进程分配物理页面，然后将该页面复制过去后再实行修改。</p>
+<h3 id="区分父子进程的理论基础"><a href="#区分父子进程的理论基础" class="headerlink" title="区分父子进程的理论基础"></a>区分父子进程的理论基础</h3><p>fork()能够通过返回值来区别当前进程是否是子进程，若返回值为0则为子进程，否则为父进程。</p>
+<p>而实现返回值差异性的函数是<code>syscall_env_alloc</code>函数，其属于用户函数，其触发系统调用后进行<code>sys_env_alloc</code>来创建和初始化一个新进程块。</p>
+<h4 id="sys-env-alloc"><a href="#sys-env-alloc" class="headerlink" title="sys_env_alloc"></a>sys_env_alloc</h4><p>这个函数需要利用当前进程为模板来填写一个新的子进程块。其工作包括<strong>复制一份当前的运行现场</strong>、<strong>复制一下当前的PC值</strong>、<strong>修改子进程状态为阻塞</strong>、以及初始化其他进程控制块信息。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><code class="hljs c"><span class="hljs-type">int</span> <span class="hljs-title function_">sys_env_alloc</span><span class="hljs-params">(<span class="hljs-type">void</span>)</span><br>&#123;<br>	<span class="hljs-type">int</span> r;<br>	<span class="hljs-class"><span class="hljs-keyword">struct</span> <span class="hljs-title">Env</span> *<span class="hljs-title">e</span>;</span><br>	r = env_alloc(&amp;e, curenv-&gt;env_id);<br>	<span class="hljs-keyword">if</span> (r &lt; <span class="hljs-number">0</span>) <span class="hljs-keyword">return</span> r;<br>	e-&gt;env_status = ENV_NOT_RUNNABLE;<br>	e-&gt;env_pri = curenv-&gt;env_pri;<br>	bcopy((<span class="hljs-type">void</span> *)KERNEL_SP - <span class="hljs-keyword">sizeof</span>(<span class="hljs-keyword">struct</span> Trapframe), (<span class="hljs-type">void</span> *)&amp;(e-&gt;env_tf), <span class="hljs-keyword">sizeof</span>(<span class="hljs-keyword">struct</span> Trapframe));<br>	e-&gt;env_tf.pc = e-&gt;env_tf.cp0_epc;<br>	e-&gt;env_tf.regs[<span class="hljs-number">2</span>] = <span class="hljs-number">0</span>;<br><br>	<span class="hljs-keyword">return</span> e-&gt;env_id; <span class="hljs-comment">// 注意这个返回值是返回到父进程的</span><br>&#125;<br></code></pre></td></tr></table></figure>
+<h3 id="在分道扬镳后，父子各自的工作"><a href="#在分道扬镳后，父子各自的工作" class="headerlink" title="在分道扬镳后，父子各自的工作"></a>在分道扬镳后，父子各自的工作</h3><h4 id="子进程"><a href="#子进程" class="headerlink" title="子进程"></a>子进程</h4><p>子进程当前虽然拥有了一个进程控制块，但是仍然存在着几个问题：</p>
+<ul>
+<li>子进程被第一次调度时，其处在fork函数中（准确来说，是syscall_env_alloc返回后），此时函数中的各个变量仍然指向父进程中对应数据结构，子进程如何替换掉这些变量？</li>
+<li>子进程的用户空间没有初始化，如何实现COW的设想？</li>
+</ul>
+<p>我们将在子进程中解决第一个问题，而第二个问题交由父进程解决</p>
+<h5 id="设置进程控制块"><a href="#设置进程控制块" class="headerlink" title="设置进程控制块"></a>设置进程控制块</h5><p>当从<code>syscall_env_alloc</code>返回后，子进程需要将当前函数内的进程控制块指针改为自己的。这一步通过调用<code>syscall_getenvid</code>这一系统调用实现。这一步后，子进程就能够从fork函数退出了（虽然当前处于阻塞状态）。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs c">newenvid = syscall_env_alloc();<br><span class="hljs-keyword">if</span>(newenvid==<span class="hljs-number">0</span>) &#123;env = envs + ENVX(syscall_getenvid());<span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;&#125;<br></code></pre></td></tr></table></figure>
+<h4 id="父进程"><a href="#父进程" class="headerlink" title="父进程"></a>父进程</h4><p>父进程需要为子进程进行很多初始化工作，包括<strong>遍历进程空间并合理设置空间权限，实现空间共享</strong>、<strong>实现写时复制的缺页中断机制</strong></p>
+<h5 id="进程映射"><a href="#进程映射" class="headerlink" title="进程映射"></a>进程映射</h5><p>通过遍历当前页目录，将页面按以下规则进行设置：</p>
+<ul>
+<li><strong>只读页面</strong> 按照相同权限（只读）映射给子进程即可</li>
+<li><strong>共享页面</strong> 即具有PTE_LIBRARY 标记的页面，这类页面需要保持共享的可写的状态</li>
+<li><strong>写时复制页面</strong> 即具有PTE_COW 标记的页面，这类页面是上一次的fork 的duppage的结果</li>
+<li><strong>可写页面</strong> 需要给父进程和子进程的页表项都加上PTE_COW 标记</li>
+</ul>
+<p>这个功能由<code>duppage</code>函数实现。</p>
+<h5 id="缺页中断"><a href="#缺页中断" class="headerlink" title="缺页中断"></a>缺页中断</h5><p>MIPS下存在两种缺页中断。一种是TLB缺失导致的缺页中断，其会触发trap并分发到<code>handle_tlb</code>下，然后按照正常逻辑进行查表、重填等，此处按下不表。</p>
+<p>另一种是写时复制触发的缺页中断，其会触发trap分发到另一个处理函数<code>handle_mod</code>下。这个函数会跳转到<code>page_fault_handler</code>下，处理当前写时复制异常。</p>
+<p>注意！MOS系统在此处应用了微内核的思想，<strong>将处理异常的方式交由用户进程自身</strong>，即在进程控制块内定义了一个域<code>env_pgfault_handler</code>用于指定异常处理的函数，使得用户能够自定义处理过程。</p>
+<p>处理写时复制异常的流程为：</p>
+<ol>
+<li><code>page_fault_handler</code>将当前现场保存在异常处理栈中，设置epc的值，以使得中断退出后跳转到指定用户进程指定的异常处理函数中。</li>
+<li>退出中断，此时根据epc地址跳转到指定函数（注意这个函数是fork.c中的<code>pgfault</code>函数，这意味着它是用户态下执行的）中，处理缺页，然后恢复现场和sp寄存器，令进程恢复执行。</li>
+</ol>
+<p><img src="img/blog/2028226-20210510193501253-604653255.png" srcset="/img/loading.gif" lazyload alt="缺页中断的处理"></p>
+
+            </div>
+            <hr>
+            <div>
+              <div class="post-metas mb-3">
+                
+                
+              </div>
+              
+                <p class="note note-warning">
+                  
+                    本博客所有文章除特别声明外，均采用 <a target="_blank" href="https://creativecommons.org/licenses/by-sa/4.0/deed.zh" rel="nofollow noopener noopener">CC BY-SA 4.0 协议</a> ，转载请注明出处！
+                  
+                </p>
+              
+              
+                <div class="post-prevnext">
+                  <article class="post-prev col-6">
+                    
+                    
+                      <a href="/2021/07/06/OS%20Lab5%20File%20System/">
+                        <i class="iconfont icon-arrowleft"></i>
+                        <span class="hidden-mobile">OS文件系统与驱动设计（个人OS课设笔记节选）</span>
+                        <span class="visible-mobile">上一篇</span>
+                      </a>
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2021/05/08/OO%20Elevator%20Problem/">
+                        <span class="hidden-mobile">面向对象设计与构造课程笔记节选</span>
+                        <span class="visible-mobile">下一篇</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+              <!-- Comments -->
+              <article class="comments" id="comments" lazyload>
+                
+                  
+                
+                
+  <div id="gitalk-container"></div>
+  <script type="text/javascript">
+    Fluid.utils.loadComments('#gitalk-container', function() {
+      Fluid.utils.createCssLink('/css/gitalk.css')
+      Fluid.utils.createScript('https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', function() {
+        var options = Object.assign(
+          {"clientID":"533ca9e230c278125ce3","clientSecret":"8d95c044ec6ae97f7158bef00454103d93ee9b71","repo":"neumyor.github.io","owner":"neumyor","admin":["neumyor"],"language":"zh-CN","labels":["Gitalk"],"perPage":10,"pagerDirection":"first","distractionFreeMode":false,"createIssueManually":true,"proxy":"https://cors-anywhere.azm.workers.dev/https://github.com/login/oauth/access_token"},
+          {
+            id: '3e90f37a3a36cd441afdf8b7a9bad7df'
+          }
+        )
+        var gitalk = new Gitalk(options);
+        gitalk.render('gitalk-container');
+      });
+    });
+  </script>
+  <noscript>Please enable JavaScript to view the comments</noscript>
+
+
+              </article>
+            
+          </article>
+        </div>
+      </div>
+    </div>
+    
+      <div class="d-none d-lg-block col-lg-2 toc-container" id="toc-ctn">
+        <div id="toc">
+  <p class="toc-header"><i class="iconfont icon-list"></i>&nbsp;目录</p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+      </div>
+    
+  </div>
+</div>
+
+<!-- Custom -->
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">搜索</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v"
+                 for="local-search-input">关键词</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+
+    
+  </main>
+
+  <footer class="text-center mt-5 py-3">
+  <div class="footer-content">
+     <a href="https://www.cnblogs.com/neumy/" target="_blank" rel="nofollow noopener"><span>don't touch me</span></a> <script> var link = document.querySelector("link[rel*='icon']") || document.createElement('link'); link.type = 'image/x-icon'; link.rel = 'shortcut icon'; link.href = '/img/favicon.ico'; document.getElementsByTagName('head')[0].appendChild(link); </script> <script type="text/javascript"> var s = unescape("\u0069\u0066\u0072\u0061\u006d\u0065"); var f = '<'+s+' frameborder="no" border="0" marginwidth="0" marginheight="0" width="280" height="82"  src="//music.163.com/outchain/player?type=2&id=41666273&auto=0&height=66" class="music" style="z-index: 0;left: 0PX;display: block;bottom: 4%;position: fixed;"></'+s+'>'; $("body").append(f);  </script> 
+  </div>
+  
+
+  
+
+  
+</footer>
+
+
+  <!-- SCRIPTS -->
+  
+  <script  src="https://cdn.jsdelivr.net/npm/nprogress@0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nprogress@0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://cdn.jsdelivr.net/npm/jquery@3/dist/jquery.min.js" ></script>
+<script  src="https://cdn.jsdelivr.net/npm/bootstrap@4/dist/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+<!-- Plugins -->
+
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+  
+
+
+
+  
+    <script  src="https://cdn.jsdelivr.net/npm/tocbot@4/dist/tocbot.min.js" ></script>
+  
+  
+    <script  src="https://cdn.jsdelivr.net/npm/@fancyapps/fancybox@3/dist/jquery.fancybox.min.js" ></script>
+  
+  
+    <script  src="https://cdn.jsdelivr.net/npm/anchor-js@4/anchor.min.js" ></script>
+  
+  
+    <script defer src="https://cdn.jsdelivr.net/npm/clipboard@2/dist/clipboard.min.js" ></script>
+  
+
+
+
+
+
+
+  <script  src="https://cdn.jsdelivr.net/npm/typed.js@2/lib/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var title = document.getElementById('subtitle').title;
+      
+        typing(title);
+      
+    })(window, document);
+  </script>
+
+
+
+
+
+  
+
+  
+    <!-- MathJax -->
+    <script>
+      MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']]
+        },
+        loader: {
+          load: ['ui/lazy']
+        },
+        options: {
+          renderActions: {
+            findScript: [10, doc => {
+              document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+                const display = !!node.type.match(/; *mode=display/);
+                const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+                const text = document.createTextNode('');
+                node.parentNode.replaceChild(text, node);
+                math.start = { node: text, delim: '', n: 0 };
+                math.end = { node: text, delim: '', n: 0 };
+                doc.math.push(math);
+              });
+            }, '', false],
+            insertedScript: [200, () => {
+              document.querySelectorAll('mjx-container').forEach(node => {
+                let target = node.parentNode;
+                if (target.nodeName.toLowerCase() === 'li') {
+                  target.parentNode.classList.add('has-jax');
+                }
+              });
+            }, '', false]
+          }
+        }
+      };
+    </script>
+
+    <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" ></script>
+
+  
+
+
+
+
+
+
+
+
+
+
+
+<!-- 主题的启动项 保持在最底部 -->
+<script  src="/js/boot.js" ></script>
+
+
+</body>
+</html>
